@@ -196,6 +196,9 @@ hott_telemetry_thread_main(int argc, char *argv[])
 			case GPS_SENSOR_ID:
 				build_gps_response(buffer, &size);
 				break;
+			case VARIO_SENSOR_ID:
+				build_vario_response(buffer, &size);
+				break;
 
 			default:
 				continue;	// Not a module we support.

@@ -232,6 +232,31 @@ struct gps_module_msg {
 	uint8_t checksum;		/**< Lower 8-bits of all bytes summed */
 };
 
+/* Vario sensor constants. */
+#define VARIO_SENSOR_ID			0x89
+#define VARIO_SENSOR_TEXT_ID	0x90
+
+struct vario_module_msg
+{
+	uint8_t start; // #01 - 0x7C
+	uint8_t sensor_id; // #02 - HOTT_VARIO_ID (0x89)
+	uint8_t warning; // #03 - Warning Beeps / Speech Output
+	uint8_t sensor_text_id; // #04 - 0x90
+	uint8_t alarm_inverse; // #05
+	uint16_t altitude; // #06-07 // 500 = 0m
+	uint16_t max_altitude; // #08-09 // 500 = 0m
+	uint16_t min_altitude; // #10-11 // 500 = 0m
+	uint16_t m_sec; // #12-13 // 3000 = 0
+	uint16_t m_3sec; // #14-15 // 120 = 0
+	uint16_t m_10sec; // #16-17
+	char text[21]; // #18-38
+	char free_characters[3]; // #39-41
+	uint8_t null_byte; // #42 - 0x00
+	uint8_t version; // #43 - 0x00
+	uint8_t stop; // #44 - 0x7D
+	uint8_t checksum;		/**< Lower 8-bits of all bytes summed */
+};
+
 // The maximum size of a message.
 #define MAX_MESSAGE_BUFFER_SIZE 45
 
@@ -242,6 +267,7 @@ __EXPORT void publish_gam_message(const uint8_t *buffer);
 __EXPORT void build_eam_response(uint8_t *buffer, size_t *size);
 __EXPORT void build_gam_response(uint8_t *buffer, size_t *size);
 __EXPORT void build_gps_response(uint8_t *buffer, size_t *size);
+__EXPORT void build_vario_response(uint8_t *buffer, size_t *size);
 __EXPORT float _get_distance_to_next_waypoint(double lat_now, double lon_now, double lat_next, double lon_next);
 __EXPORT void convert_to_degrees_minutes_seconds(double lat, int *deg, int *min, int *sec);
 

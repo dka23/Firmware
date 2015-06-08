@@ -50,6 +50,7 @@
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_status.h>
 
 #include <drivers/drv_hrt.h>
 
@@ -62,6 +63,7 @@ static int _home_sub = -1;
 static int _sensor_sub = -1;
 static int _airspeed_sub = -1;
 static int _esc_sub = -1;
+static int _status_sub = -1;
 
 static orb_advert_t _esc_pub = nullptr;
 
@@ -78,6 +80,7 @@ init_sub_messages(void)
 	_sensor_sub = orb_subscribe(ORB_ID(sensor_combined));
 	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	_esc_sub = orb_subscribe(ORB_ID(esc_status));
+	_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 }
 
 void 
@@ -178,6 +181,10 @@ build_gam_response(uint8_t *buffer, size_t *size)
 	memset(&esc, 0, sizeof(esc));
 	orb_copy(ORB_ID(esc_status), _esc_sub, &esc);
 
+	struct vehicle_status_s status;
+	memset(&status, 0, sizeof(status));
+	orb_copy(ORB_ID(vehicle_status), _status_sub, &status);
+
 	struct gam_module_msg msg;
 	*size = sizeof(msg);
 	memset(&msg, 0, *size);
@@ -200,6 +207,12 @@ build_gam_response(uint8_t *buffer, size_t *size)
 	const uint16_t rpm = (uint16_t)(esc.esc[0].esc_rpm * 0.1f);
 	msg.rpm_L = (uint8_t)rpm & 0xff;
 	msg.rpm_H = (uint8_t)(rpm >> 8) & 0xff;
+
+	/* Battery Warning */
+	if (status.battery_warning == status.VEHICLE_BATTERY_WARNING_LOW
+			|| status.battery_warning == status.VEHICLE_BATTERY_WARNING_CRITICAL) {
+		msg.warning_beeps = 'R';
+	}
 
 	msg.stop = STOP_BYTE;
 	memcpy(buffer, &msg, *size);
@@ -314,6 +327,62 @@ build_gps_response(uint8_t *buffer, size_t *size)
 			msg.home_direction = (uint8_t)bearing >> 1;
 		}
 	}
+
+	msg.stop = STOP_BYTE;
+	memcpy(buffer, &msg, *size);
+}
+
+void
+build_vario_response(uint8_t *buffer, size_t *size)
+{
+	struct vehicle_gps_position_s gps;
+	memset(&gps, 0, sizeof(gps));
+	orb_copy(ORB_ID(vehicle_gps_position), _gps_sub, &gps);
+
+	struct vehicle_status_s status;
+	memset(&status, 0, sizeof(status));
+	orb_copy(ORB_ID(vehicle_status), _status_sub, &status);
+
+	struct vario_module_msg msg;
+	*size = sizeof(msg);
+	memset(&msg, 0, *size);
+
+	msg.start = START_BYTE;
+	msg.sensor_id = VARIO_SENSOR_ID;
+	msg.sensor_text_id = VARIO_SENSOR_TEXT_ID;
+
+	switch(status.main_state) {
+	case status.MAIN_STATE_MANUAL:
+		memcpy(msg.text, "MANUAL ", 7);
+		break;
+	case status.MAIN_STATE_ALTCTL:
+		memcpy(msg.text, "ALTCTL ", 7);
+		break;
+	case status.MAIN_STATE_POSCTL:
+		memcpy(msg.text, "POSCTL ", 7);
+		break;
+	case status.MAIN_STATE_AUTO_LOITER:
+		memcpy(msg.text, "LOITER ", 7);
+		break;
+	case status.MAIN_STATE_AUTO_MISSION:
+		memcpy(msg.text, "MISSION", 7);
+		break;
+	case status.MAIN_STATE_AUTO_RTL:
+		memcpy(msg.text, "RTL    ", 7);
+		break;
+	case status.MAIN_STATE_ACRO:
+		memcpy(msg.text, "ACRO   ", 7);
+		break;
+	case status.MAIN_STATE_OFFBOARD:
+		memcpy(msg.text, "OFFBOAR", 7);
+		break;
+	case status.MAIN_STATE_MAX:
+		memcpy(msg.text, "MAX    ", 7);
+		break;
+	}
+
+	/* Altitude */
+	msg.altitude = (uint16_t)(gps.alt*1e-3f + 500.0f);
 
 	msg.stop = STOP_BYTE;
 	memcpy(buffer, &msg, *size);
